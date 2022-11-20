@@ -32,15 +32,13 @@ typedef struct ARPFrame_t {
 	DWORD RecvIP;	//目的IP地址
 } ARPFrame_t;
 #pragma pack ()
-
 //全局
 pcap_t* adhandle;		//捕捉实例,是pcap_open返回的对象
 string IPList[100];		//存储网卡设备IP地址
-string DesIP;				//目的IP
+string DesIP;			//目的IP
 int dev_nums = 0;		//适配器计数变量
 bool Remote = 0;		//是否远端
 BYTE MyMAC[6];			//本机设备MAC地址
-
 bool CompareMAC(BYTE* MAC_1, BYTE* MAC_2) {
 	for (int i = 0; i < 6; i++) {
 		if (MAC_1[i] != MAC_2[i]) {
@@ -49,15 +47,14 @@ bool CompareMAC(BYTE* MAC_1, BYTE* MAC_2) {
 	}
 	return true;
 }
-
 void CopyMAC(BYTE* MAC_1, BYTE* MAC_2) {
 	for (int i = 0; i < 6; i++) {
 		MAC_2[i] = MAC_1[i];
 	}
 }
-
+//打印MAC地址
 void PrintPacketMAC(ARPFrame_t* RecPacket) {
-	printf("%s:\t%02x-%02x-%02x-%02x-%02x-%02x\n", "MAC地址",
+	printf("%s:\t%02x-%02x-%02x-%02x-%02x-%02x\n", "目标MAC地址",
 		RecPacket->FrameHeader.SrcMAC[0],
 		RecPacket->FrameHeader.SrcMAC[1],
 		RecPacket->FrameHeader.SrcMAC[2],
@@ -66,7 +63,6 @@ void PrintPacketMAC(ARPFrame_t* RecPacket) {
 		RecPacket->FrameHeader.SrcMAC[5]);
 	return;
 }
-
 //遍历接口列表
 void DevsList(pcap_if_t* alldevs) {
 	for (pcap_if_t* d = alldevs; d != nullptr; d = d->next)//显示接口列表
@@ -88,7 +84,6 @@ void DevsList(pcap_if_t* alldevs) {
 		}
 	}
 }
-
 //伪造ARP包
 ARPFrame_t MakeARP(pcap_addr* a) {
 	ARPFrame_t ARPFrame;
@@ -117,14 +112,12 @@ ARPFrame_t MakeARP(pcap_addr* a) {
 	ARPFrame.RecvIP = inet_addr(inet_ntoa(((struct sockaddr_in*)a->addr)->sin_addr));
 	return ARPFrame;
 }
-
 //发包
 int Send(pcap_t* adhandle, ARPFrame_t ARPFrame) {
 	pcap_sendpacket(adhandle, (u_char*)&ARPFrame, sizeof(ARPFrame_t)); //{ cout << "发包失败"; return 1; }// !=0的时候为send发生错误
 	//else { return 1; }
 	return 1;
 }
-
 //收包
 ARPFrame_t* Recv(pcap_t* adhandle) {
 	struct pcap_pkthdr* pkt_header;
@@ -143,7 +136,16 @@ ARPFrame_t* Recv(pcap_t* adhandle) {
 		}
 	}
 }
-
+bool isRemote() {
+	for (int i = 0; i < dev_nums; i++) {
+		if (IPList[i] == DesIP) {
+			Remote = false;
+			return false;
+		}
+	}
+	Remote = true;
+	return true;
+}
 //获取MAC地址
 void GetMAC(pcap_if_t* alldevs, int dev_index) {
 	int index = 0;
@@ -157,8 +159,8 @@ void GetMAC(pcap_if_t* alldevs, int dev_index) {
 			{
 				//输入IP查看MAC
 				if (dev_index == index) {
-					printf("%s\t\t%s\n%s\t%s\n", "name:", d->name, "description:", d->description);
-					printf("%s\t\t%s\n", "IP地址:", inet_ntoa(((struct sockaddr_in*)a->addr)->sin_addr));
+					/*printf("%s\t\t%s\n%s\t%s\n", "name:", d->name, "description:", d->description);*/
+					printf("%s\t%s\n", "本机IP地址:", inet_ntoa(((struct sockaddr_in*)a->addr)->sin_addr));
 
 					//在当前网卡上伪造一个包
 					ARPFrame_t ARPFrame = MakeARP(a);
@@ -194,28 +196,34 @@ void GetMAC(pcap_if_t* alldevs, int dev_index) {
 		}
 	}
 }
-
 int main() {
+
 	pcap_if_t* alldevs;				 //所有网络适配器
 	char errbuf[PCAP_ERRBUF_SIZE];   //错误缓冲区,大小为256
 	pcap_findalldevs_ex(PCAP_SRC_IF_STRING, NULL, &alldevs, errbuf);
-	
+
 	//遍历 显示所有网卡信息
 	DevsList(alldevs);
 
-	int dev_index;
-	cout << "请选择网卡: ";
-	cin >> dev_index;
+	while (true) {
+		int dev_index;
+		cout << "请选择网卡设备:\t";
+		cin >> dev_index;
 
-	//输入想查询的IP地址
-	cout << "请输入IP: ";
-	cin >> DesIP;
+		//输入想查询的IP地址
+		cout << "请输入目标IP:\t";
+		cin >> DesIP;
 
-	cout << "本机 0, 远程 1: ";
-	cin >> Remote;
-	
-	//获取MAC地址
-	GetMAC(alldevs, dev_index);
+		//cout << "本机 0, 远程 1: ";
+		//cin >> Remote;
+		Remote = isRemote();
+
+		//获取MAC地址
+		GetMAC(alldevs, dev_index);
+		printf("-----------------------------------------------------------\n");
+	}
+
 	//释放资源
 	pcap_freealldevs(alldevs);
+
 }
