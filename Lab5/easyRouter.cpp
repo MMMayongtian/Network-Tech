@@ -1,73 +1,77 @@
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
 #define _CRT_SECURE_NO_WARNINGS
+#define MAX_BUFF 1000
 #include"pcap.h"
 #include <WinSock2.h>
 #include <Windows.h>
-#include<iostream>
-#include<stdio.h>
+#include <iostream>
+#include <stdio.h>
 using namespace std;
 
 #pragma comment(lib, "packet.lib")
 #pragma comment(lib, "wpcap.lib")
 #pragma comment(lib,"ws2_32.lib")
 
-#pragma pack (1)//è¿›å…¥å­—èŠ‚å¯¹é½æ–¹å¼
-//ä»¥å¤ªç½‘å¸§ 14å­—èŠ‚
+#pragma pack (1)//½øÈë×Ö½Ú¶ÔÆë·½Ê½
+//ÒÔÌ«ÍøÖ¡ 14×Ö½Ú
 typedef struct FrameHeader_t {
-	BYTE DesMAC[6];// ç›®çš„åœ°å€
-	BYTE SrcMAC[6];//æºåœ°å€
-	WORD FrameType;//å¸§ç±»å‹
+	BYTE DesMAC[6];// Ä¿µÄµØÖ·
+	BYTE SrcMAC[6];//Ô´µØÖ·
+	WORD FrameType;//Ö¡ÀàĞÍ
 }FrameHeader_t;
-//ARPå¸§ 28å­—èŠ‚
+//ARPÖ¡ 28×Ö½Ú
 typedef struct ARPFrame_t {
-	FrameHeader_t FrameHeader;//ä»¥å¤ªç½‘å¸§å¤´
-	WORD HardwareType;//ç¡¬ä»¶ç±»å‹
-	WORD ProtocolType;//åè®®ç±»å‹
-	BYTE HLen;//ç¡¬ä»¶åœ°å€é•¿åº¦
-	BYTE PLen;//åè®®åœ°å€é•¿åº¦
+	FrameHeader_t FrameHeader;//ÒÔÌ«ÍøÖ¡Í·
+	WORD HardwareType;//Ó²¼şÀàĞÍ
+	WORD ProtocolType;//Ğ­ÒéÀàĞÍ
+	BYTE HLen;//Ó²¼şµØÖ·³¤¶È
+	BYTE PLen;//Ğ­ÒéµØÖ·³¤¶È
 	WORD Operation;
-	BYTE SendHa[6];	//å‘é€ç«¯ä»¥å¤ªç½‘åœ°å€
-	DWORD SendIP;	//å‘é€ç«¯IPåœ°å€
-	BYTE RecvHa[6];	//ç›®çš„ä»¥å¤ªç½‘åœ°å€
-	DWORD RecvIP;	//ç›®çš„IPåœ°å€
+	BYTE SendHa[6];	//·¢ËÍ¶ËÒÔÌ«ÍøµØÖ·
+	DWORD SendIP;	//·¢ËÍ¶ËIPµØÖ·
+	BYTE RecvHa[6];	//Ä¿µÄÒÔÌ«ÍøµØÖ·
+	DWORD RecvIP;	//Ä¿µÄIPµØÖ·
 } ARPFrame_t;
-typedef struct IPHeader_t {//IPé¦–éƒ¨
+//IPÊ×²¿
+typedef struct IPHeader_t {
 	BYTE Ver_HLen;
 	BYTE TOS;
 	WORD TotalLen;
 	WORD ID;
 	WORD Flag_Segment;
-	BYTE TTL;//ç”Ÿå‘½å‘¨æœŸ
+	BYTE TTL;//ÉúÃüÖÜÆÚ
 	BYTE Protocol;
-	WORD Checksum;//æ ¡éªŒå’Œ
-	ULONG SrcIP;//æºIP
-	ULONG DstIP;//ç›®çš„IP
+	WORD Checksum;//Ğ£ÑéºÍ
+	ULONG SrcIP;//Ô´IP
+	ULONG DstIP;//Ä¿µÄIP
 }IPHeader_t;
-typedef struct Data_t {//åŒ…å«å¸§é¦–éƒ¨å’ŒIPé¦–éƒ¨çš„æ•°æ®åŒ…
-	FrameHeader_t FrameHeader;//å¸§é¦–éƒ¨
-	IPHeader_t IPHeader;//IPé¦–éƒ¨
+//°üº¬Ö¡Ê×²¿ºÍIPÊ×²¿µÄÊı¾İ°ü
+typedef struct Data_t {
+	FrameHeader_t FrameHeader;//Ö¡Ê×²¿
+	IPHeader_t IPHeader;//IPÊ×²¿
 }Data_t;
-typedef struct ICMP {//åŒ…å«å¸§é¦–éƒ¨å’ŒIPé¦–éƒ¨çš„æ•°æ®åŒ…
+//°üº¬Ö¡Ê×²¿ºÍIPÊ×²¿µÄÊı¾İ°ü
+typedef struct ICMP {
 	FrameHeader_t FrameHeader;
 	IPHeader_t IPHeader;
-	char buf[0x80];
+	char buf[40];
 }ICMP_t;
 #pragma pack ()
 
-//æ‰“å°MACåœ°å€
+//´òÓ¡MACµØÖ·
 void printMAC(BYTE* MAC) {
 	printf("%02x-%02x-%02x-%02x-%02x-%02x",MAC[0],MAC[1],MAC[2],MAC[3],MAC[4],MAC[5]);
 	return;
 }
 
-//å…¨å±€å˜é‡
+//È«¾Ö±äÁ¿
 pcap_if_t* alldevs;
-//pcap_t* adhandle;		//æ•æ‰å®ä¾‹,æ˜¯pcap_openè¿”å›çš„å¯¹è±¡
-char ipList[10][32];		//å­˜å‚¨ç½‘å¡è®¾å¤‡IPåœ°å€
+//pcap_t* adhandle;		//²¶×½ÊµÀı,ÊÇpcap_open·µ»ØµÄ¶ÔÏó
+char ipList[10][32];		//´æ´¢Íø¿¨Éè±¸IPµØÖ·
 char maskList[10][32];
-
-int dev_nums = 0;		//é€‚é…å™¨è®¡æ•°å˜é‡
-BYTE MyMAC[6];			//æœ¬æœºè®¾å¤‡MACåœ°å€
+int dev_nums = 0;		//ÊÊÅäÆ÷¼ÆÊı±äÁ¿
+BYTE MyMAC[6];			//±¾»úÉè±¸MACµØÖ·
+//MAC²Ù×÷
 bool CompareMAC(BYTE* MAC_1, BYTE* MAC_2) {
 	for (int i = 0; i < 6; i++) {
 		if (MAC_1[i] != MAC_2[i]) {
@@ -81,55 +85,51 @@ void CopyMAC(BYTE* MAC_1, BYTE* MAC_2) {
 		MAC_2[i] = MAC_1[i];
 	}
 }
-void setCheckSum(Data_t* dataPacket)//è®¾ç½®æ ¡éªŒå’Œ
-{
+//ÉèÖÃĞ£ÑéºÍ
+void setCheckSum(Data_t* dataPacket){
 	dataPacket->IPHeader.Checksum = 0;
 	unsigned int sum = 0;
-	WORD* t = (WORD*)&dataPacket->IPHeader;//16bitä¸€ç»„
-	for (int i = 0; i < sizeof(IPHeader_t) / 2; i++)
-	{
+	WORD* t = (WORD*)&dataPacket->IPHeader;//16bitÒ»×é
+	for (int i = 0; i < sizeof(IPHeader_t) / 2; i++){
 		sum += t[i];
-		while (sum >= 0x10000)//æº¢å‡º
-		{
+		while (sum >= 0x10000){
 			int s = sum >> 16;
 			sum -= 0x10000;
 			sum += s;
 		}
 	}
-	dataPacket->IPHeader.Checksum = ~sum;//å–å
+	dataPacket->IPHeader.Checksum = ~sum;//È¡·´
 }
-bool checkCheckSum(Data_t* dataPacket)//æ£€éªŒ
-{
+//Ğ£Ñé
+bool checkCheckSum(Data_t* dataPacket) {
 	unsigned int sum = 0;
 	WORD* t = (WORD*)&dataPacket->IPHeader;
-	for (int i = 0; i < sizeof(IPHeader_t) / 2; i++)
-	{
+	for (int i = 0; i < sizeof(IPHeader_t) / 2; i++){
 		sum += t[i];
-		while (sum >= 0x10000)
-		{
+		while (sum >= 0x10000){
 			int s = sum >> 16;
 			sum -= 0x10000;
 			sum += s;
 		}
 	}
 	if (sum == 65535)
-		return 1;//æ ¡éªŒæ­£ç¡®
+		return 1;//Ğ£ÑéÕıÈ·
 	return 0;
 }
-//è·¯ç”±æ¡ç›®
+//Â·ÓÉÌõÄ¿
 class RouteEntry
 {
 public:
-	DWORD destIP;	//ç›®çš„åœ°å€
-	DWORD mask;		//å­ç½‘æ©ç 
-	DWORD nextHop;	//ä¸‹ä¸€è·³
-	bool fault;		//æ˜¯å¦ä¸ºé»˜è®¤è·¯ç”±
-	RouteEntry* nextEntry;	//é“¾å¼å­˜å‚¨
+	DWORD destIP;	//Ä¿µÄµØÖ·
+	DWORD mask;		//×ÓÍøÑÚÂë
+	DWORD nextHop;	//ÏÂÒ»Ìø
+	bool fault;		//ÊÇ·ñÎªÄ¬ÈÏÂ·ÓÉ
+	RouteEntry* nextEntry;	//Á´Ê½´æ´¢
 	RouteEntry(){
-		memset(this, 0, sizeof(*this));//åˆå§‹åŒ–ä¸ºå…¨0
+		memset(this, 0, sizeof(*this));//³õÊ¼»¯ÎªÈ«0
 		nextEntry = NULL;
 	}
-	void printEntry()//æ‰“å°è¡¨é¡¹å†…å®¹ï¼Œæ‰“å°å‡ºæ©ç ã€ç›®çš„ç½‘ç»œå’Œä¸‹ä¸€è·³IPã€ç±»å‹ï¼ˆæ˜¯å¦æ˜¯ç›´æ¥æŠ•é€’ï¼‰
+	void printEntry()//´òÓ¡±íÏîÄÚÈİ£¬´òÓ¡³öÑÚÂë¡¢Ä¿µÄÍøÂçºÍÏÂÒ»ÌøIP¡¢ÀàĞÍ£¨ÊÇ·ñÊÇÖ±½ÓÍ¶µİ£©
 	{	
 		unsigned char* pIP = (unsigned char*)&destIP;
 		printf("destIP : %u.%u.%u.%u\t", *pIP, *(pIP + 1), *(pIP + 2), *(pIP + 3));
@@ -145,25 +145,25 @@ public:
 		}
 	}
 };
-//è·¯ç”±è¡¨
+//Â·ÓÉ±í
 class RouteTable
 {
 public:
 	RouteEntry* head;
-	int routeNum;//æ¡æ•°
-	//åˆå§‹åŒ–ï¼Œæ·»åŠ ç›´æ¥è¿æ¥çš„ç½‘ç»œ
+	int routeNum;//ÌõÊı
+	//³õÊ¼»¯£¬Ìí¼ÓÖ±½ÓÁ¬½ÓµÄÍøÂç
 	void initRouteTable() {
 		head = NULL;
 		routeNum = 0;
 		for (int i = 0; i < 2; i++) {
 			RouteEntry* newEntry = new RouteEntry();
-			newEntry->destIP = (inet_addr(ipList[i])) & (inet_addr(maskList[i]));//æœ¬æœºç½‘å¡çš„ipå’Œæ©ç è¿›è¡ŒæŒ‰ä½ä¸å³ä¸ºæ‰€åœ¨ç½‘ç»œ
+			newEntry->destIP = (inet_addr(ipList[i])) & (inet_addr(maskList[i]));//±¾»úÍø¿¨µÄipºÍÑÚÂë½øĞĞ°´Î»Óë¼´ÎªËùÔÚÍøÂç
 			newEntry->mask = inet_addr(maskList[i]);
-			newEntry->fault = 1;//0è¡¨ç¤ºç›´æ¥æŠ•é€’çš„ç½‘ç»œï¼Œä¸å¯åˆ é™¤
-			this->addEntry(newEntry);//æ·»åŠ è¡¨é¡¹
+			newEntry->fault = 1;//0±íÊ¾Ö±½ÓÍ¶µİµÄÍøÂç£¬²»¿ÉÉ¾³ı
+			this->addEntry(newEntry);//Ìí¼Ó±íÏî
 		}
 	}
-	//è·¯ç”±è¡¨çš„æ·»åŠ ï¼Œç›´æ¥æŠ•é€’åœ¨æœ€å‰ï¼Œå‰ç¼€é•¿çš„åœ¨å‰é¢
+	//Â·ÓÉ±íµÄÌí¼Ó£¬Ö±½ÓÍ¶µİÔÚ×îÇ°£¬Ç°×º³¤µÄÔÚÇ°Ãæ
 	void addEntry(RouteEntry* newEntry) {
 		if (head == NULL) {
 			head = newEntry;
@@ -182,7 +182,7 @@ public:
 			routeNum++;
 			return;
 		}
-		//æŒ‰æ©ç ç”±é•¿è‡³çŸ­æ‰¾åˆ°åˆé€‚çš„ä½ç½®
+		//°´ÑÚÂëÓÉ³¤ÖÁ¶ÌÕÒµ½ºÏÊÊµÄÎ»ÖÃ
 		RouteEntry* cur = head;
 		while (cur->nextEntry) {
 			if (newEntry->mask > cur->nextEntry->mask) {
@@ -195,28 +195,28 @@ public:
 		routeNum++;
 		return;
 	}
-	//åˆ é™¤
-	bool deleteEntry(int index) {
-		if (index > routeNum) {
-			printf("Error! Access out of bounds, no entry exists!\n");
-			return false;
-		}
-		int i = 1;
-		RouteEntry* cur = head;
-		while (i < index - 1) {
-			i++;
-			cur = cur->nextEntry;
-		}
-		RouteEntry* t = cur->nextEntry;
-		if (t->fault) {
-			printf("Error! You cannot delete the default route!\n");
-			return false;
-		}
-		cur->nextEntry = t->nextEntry;
-		routeNum--;
-		delete t;
-		return true;
-	}
+	//É¾³ı
+	//bool deleteEntry(int index) {
+	//	if (index > routeNum) {
+	//		printf("Error! Access out of bounds, no entry exists!\n");
+	//		return false;
+	//	}
+	//	int i = 1;
+	//	RouteEntry* cur = head;
+	//	while (i < index - 1) {
+	//		i++;
+	//		cur = cur->nextEntry;
+	//	}
+	//	RouteEntry* t = cur->nextEntry;
+	//	if (t->fault) {
+	//		printf("Error! You cannot delete the default route!\n");
+	//		return false;
+	//	}
+	//	cur->nextEntry = t->nextEntry;
+	//	routeNum--;
+	//	delete t;
+	//	return true;
+	//}
 	bool deleteEntry(DWORD IP) {
 		if (IP == head->destIP && !head->fault) {
 			delete head;
@@ -225,27 +225,33 @@ public:
 		}
 		RouteEntry* cur = head;
 		while (cur->nextEntry) {
-			if (cur->nextEntry->destIP == IP && !cur->nextEntry->fault) {
+			if (cur->nextEntry->destIP == IP) {
 				RouteEntry* temp = cur->nextEntry;
+				if (temp->fault) {
+					printf("Unable to delete falut route entry!\n");
+					return false;
+				}
 				cur->nextEntry = temp->nextEntry;
 				delete temp;
+				printf("Successfully deleted!\n");
 				return true;
 			}
+			cur = cur->nextEntry;
 		}
 		return false;
 	}
-	//è·¯ç”±è¡¨çš„æ‰“å° mask net next type
+	//Â·ÓÉ±íµÄ´òÓ¡ mask net next type
 	void printTable() {
-		printf("\n--------------------Route Table------------------------------------------\n");
+		printf("\n--------------------Route Table-------------------------------------------------\n");
 		RouteEntry* cur = head;
 		while (cur) {
 			cur->printEntry();
 			cur = cur->nextEntry;
 		}
-		printf("-------------------------------------------------------------------------\n\n");
+		printf("--------------------------------------------------------------------------------\n\n");
 		return;
 	}
-	//æŸ¥æ‰¾ï¼Œæœ€é•¿å‰ç¼€,è¿”å›ä¸‹ä¸€è·³çš„ip
+	//²éÕÒ£¬×î³¤Ç°×º,·µ»ØÏÂÒ»ÌøµÄip
 	DWORD lookup(DWORD ip) {
 		RouteEntry* cur = head;
 		while (cur != NULL) {
@@ -260,23 +266,23 @@ public:
 		return -1;
 	}
 };
-//arpæ¡ç›®
-class arpEntry
+//arpÌõÄ¿
+class ArpEntry
 {
 public:
 	DWORD ip;//IP
 	BYTE mac[6];//MAC
 	void printEntry() {
 		unsigned char* pIP = (unsigned char*)&ip;
-		printf("IPåœ°å€: %u.%u.%u.%u \t MACåœ°å€: ", *pIP, *(pIP + 1), *(pIP + 2), *(pIP + 3));
+		printf("IPµØÖ·: %u.%u.%u.%u \t MACµØÖ·: ", *pIP, *(pIP + 1), *(pIP + 2), *(pIP + 3));
 		printf("%02x-%02x-%02x-%02x-%02x-%02x\n",mac[0],mac[1],mac[2],mac[3],mac[4],mac[5]);
 	}
 };
-//arpè¡¨
+//arp±í
 class ArpTable 
 {
 public:
-	arpEntry arp_table[50];
+	ArpEntry arp_table[50];
 	ArpTable() {
 		arpNum = 0;
 	};
@@ -292,15 +298,13 @@ public:
 		arp_table[arpNum].ip = ip;
 		CopyMAC(mac, arp_table[arpNum].mac);
 		arpNum++;
-		printf("arpEntry inserted successfully!\n");
+		printf("ArpEntry inserted successfully!\n");
 	}
-
 	int lookup(DWORD ip,BYTE mac[6]) {
 		unsigned char* pIP = (unsigned char*)&ip;
 		printf("Query ip : %u.%u.%u.%u: in the arp table.\n", *pIP, *(pIP + 1), *(pIP + 2), *(pIP + 3));
 		for (int i = 0; i < arpNum; i++) {
 			pIP = (unsigned char*)&arp_table[i].ip;
-			//printf("Be matched ip : %u.%u.%u.%u: \n", *pIP, *(pIP + 1), *(pIP + 2), *(pIP + 3));
 			if (ip == arp_table[i].ip) {
 				CopyMAC(arp_table[i].mac, mac);
 				return i;
@@ -312,15 +316,6 @@ public:
 	void printTable () {
 		printf("\n---------------------Arp Table----------------------\n");
 		for (int i = 0; i < arpNum; i++) {
-			//unsigned char* pIP = (unsigned char*)&arp_table[i].ip;
-			//printf("IPåœ°å€: %u.%u.%u.%u \t MACåœ°å€: ", *pIP, *(pIP + 1), *(pIP + 2), *(pIP + 3));
-			//printf("%02x-%02x-%02x-%02x-%02x-%02x\n",
-			//	arp_table[i].mac[0],
-			//	arp_table[i].mac[1],
-			//	arp_table[i].mac[2],
-			//	arp_table[i].mac[3],
-			//	arp_table[i].mac[4],
-			//	arp_table[i].mac[5]);
 			arp_table[i].printEntry();
 		}
 		printf("----------------------------------------------------\n\n");
@@ -330,17 +325,45 @@ public:
 RouteTable routeTable;
 ArpTable arpTable;
 
-//éå†æ¥å£åˆ—è¡¨
+//ÈÕÖ¾Êä³ö
+void outputLog(Data_t* dataPacket, bool receive) {
+	FILE* fp = fopen("myRouter.log", "a");
+	if (fp == NULL){
+		printf("´ò¿ªÎÄ¼şÊ§°Ü£¡\n");
+		return;
+	}
+	DWORD nexthop = routeTable.lookup((DWORD)dataPacket->IPHeader.DstIP);
+	unsigned char* SrcIP = (unsigned char*)&dataPacket->IPHeader.SrcIP;
+	unsigned char* DstIP = (unsigned char*)&dataPacket->IPHeader.DstIP;
+	unsigned char* nextHop = (unsigned char*)&nexthop;
+	BYTE* SrcMAC = dataPacket->FrameHeader.SrcMAC;
+	BYTE* DstMAC = dataPacket->FrameHeader.DesMAC;
+	
+	if (receive) {
+		fprintf(fp, "[receive IP] SrcIP:%u.%u.%u.%u DesIP:%u.%u.%u.%u SrcMAC:%02X-%02X-%02X-%02X-%02X-%02X DesMAC:%02X-%02X-%02X-%02X-%02X-%02X\n",
+			*SrcIP, *(SrcIP + 1), *(SrcIP + 2), *(SrcIP + 3),
+			*DstIP, *(DstIP + 1), *(DstIP + 2), *(DstIP + 3),
+			SrcMAC[0], SrcMAC[1], SrcMAC[2], SrcMAC[3], SrcMAC[4], SrcMAC[5],
+			DstMAC[0], DstMAC[1], DstMAC[2], DstMAC[3], DstMAC[4], DstMAC[5]);
+	}
+	else {
+		fprintf(fp, "[forward IP] nextHop:%u.%u.%u.%u SrcMAC:%02X-%02X-%02X-%02X-%02X-%02X DesMAC:%02X-%02X-%02X-%02X-%02X-%02X\n",
+			*nextHop, *(nextHop + 1), *(nextHop + 2), *(nextHop + 3),
+			SrcMAC[0], SrcMAC[1], SrcMAC[2], SrcMAC[3], SrcMAC[4], SrcMAC[5],
+			DstMAC[0], DstMAC[1], DstMAC[2], DstMAC[3], DstMAC[4], DstMAC[5]);
+	}
+}
+//±éÀú½Ó¿ÚÁĞ±í
 void DevsInfo(pcap_if_t* alldevs) {
-	for (pcap_if_t* d = alldevs; d != nullptr; d = d->next)//æ˜¾ç¤ºæ¥å£åˆ—è¡¨
+	for (pcap_if_t* d = alldevs; d != nullptr; d = d->next)//ÏÔÊ¾½Ó¿ÚÁĞ±í
 	{
-		//è·å–è¯¥ç½‘ç»œæ¥å£è®¾å¤‡çš„ipåœ°å€ä¿¡æ¯
+		//»ñÈ¡¸ÃÍøÂç½Ó¿ÚÉè±¸µÄipµØÖ·ĞÅÏ¢
 		for (pcap_addr* a = d->addresses; a != nullptr; a = a->next)
 		{
 			if (((struct sockaddr_in*)a->addr)->sin_family == AF_INET && a->addr)
-			{//æ‰“å°ipåœ°å€
-				//æ‰“å°ç›¸å…³ä¿¡æ¯
-				//inet_ntoaå°†ipåœ°å€è½¬æˆå­—ç¬¦ä¸²æ ¼å¼
+			{//´òÓ¡ipµØÖ·
+				//´òÓ¡Ïà¹ØĞÅÏ¢
+				//inet_ntoa½«ipµØÖ·×ª³É×Ö·û´®¸ñÊ½
 				printf("%d\n", dev_nums);
 				printf("%s\t\t%s\n%s\t%s\n", "name:", d->name, "description:", d->description);
 				printf("%s\t\t%s\n", "IP:  ", inet_ntoa(((struct sockaddr_in*)a->addr)->sin_addr));
@@ -352,78 +375,73 @@ void DevsInfo(pcap_if_t* alldevs) {
 		}
 	}
 }
-//ä¼ªé€ ARPåŒ…
+//Î±ÔìARP°ü
 ARPFrame_t MakeARP() {
 	ARPFrame_t ARPFrame;
 	for (int i = 0; i < 6; i++) 
-		ARPFrame.FrameHeader.DesMAC[i] = 0xff;//è¡¨ç¤ºå¹¿æ’­
-	//å°†APRFrame.FrameHeader.SrcMACè®¾ç½®ä¸ºæœ¬æœºç½‘å¡çš„MACåœ°å€
+		ARPFrame.FrameHeader.DesMAC[i] = 0xff;//±íÊ¾¹ã²¥
+	//½«APRFrame.FrameHeader.SrcMACÉèÖÃÎª±¾»úÍø¿¨µÄMACµØÖ·
 	for (int i = 0; i < 6; i++)
 		ARPFrame.FrameHeader.SrcMAC[i] = 0x0f;
 	//CopyMAC(ARPFrame.FrameHeader.SrcMAC, MyMAC);
-	ARPFrame.FrameHeader.FrameType = htons(0x806);//å¸§ç±»å‹ä¸ºARP
-	ARPFrame.HardwareType = htons(0x0001);//ç¡¬ä»¶ç±»å‹ä¸ºä»¥å¤ªç½‘
-	ARPFrame.ProtocolType = htons(0x0800);//åè®®ç±»å‹ä¸ºIP
-	ARPFrame.HLen = 6;//ç¡¬ä»¶åœ°å€é•¿åº¦ä¸º6
-	ARPFrame.PLen = 4;//åè®®åœ°å€é•¿ä¸º4
-	ARPFrame.Operation = htons(0x0001);//æ“ä½œä¸ºARPè¯·æ±‚
+	ARPFrame.FrameHeader.FrameType = htons(0x806);//Ö¡ÀàĞÍÎªARP
+	ARPFrame.HardwareType = htons(0x0001);//Ó²¼şÀàĞÍÎªÒÔÌ«Íø
+	ARPFrame.ProtocolType = htons(0x0800);//Ğ­ÒéÀàĞÍÎªIP
+	ARPFrame.HLen = 6;//Ó²¼şµØÖ·³¤¶ÈÎª6
+	ARPFrame.PLen = 4;//Ğ­ÒéµØÖ·³¤Îª4
+	ARPFrame.Operation = htons(0x0001);//²Ù×÷ÎªARPÇëÇó
 
-	//å°†ARPFrame.SendHaè®¾ç½®ä¸ºæœ¬æœºç½‘å¡çš„MACåœ°å€
+	//½«ARPFrame.SendHaÉèÖÃÎª±¾»úÍø¿¨µÄMACµØÖ·
 	for (int i = 0; i < 6; i++)
 		ARPFrame.SendHa[i] = 0x0f;
-	//å°†ARPFrame.SendIPè®¾ç½®ä¸ºæœ¬æœºç½‘å¡ä¸Šç»‘å®šçš„IPåœ°å€
+	//½«ARPFrame.SendIPÉèÖÃÎª±¾»úÍø¿¨ÉÏ°ó¶¨µÄIPµØÖ·
 
-	//å°†ARPFrame.RecvHaè®¾ç½®ä¸º0
+	//½«ARPFrame.RecvHaÉèÖÃÎª0
 	for (int i = 0; i < 6; i++)
-		ARPFrame.RecvHa[i] = 0;//è¡¨ç¤ºç›®çš„åœ°å€æœªçŸ¥
-	//å°†ARPFrame.RecvIPè®¾ç½®ä¸ºè¯·æ±‚çš„IPåœ°å€
+		ARPFrame.RecvHa[i] = 0;//±íÊ¾Ä¿µÄµØÖ·Î´Öª
+	//½«ARPFrame.RecvIPÉèÖÃÎªÇëÇóµÄIPµØÖ·
 	//ARPFrame.RecvIP = inet_addr(inet_ntoa(((struct sockaddr_in*)a->addr)->sin_addr));
 	return ARPFrame;
 }
-//å‘åŒ…
-int Send(pcap_t* adhandle, ARPFrame_t ARPFrame) {
-	pcap_sendpacket(adhandle, (u_char*)&ARPFrame, sizeof(ARPFrame_t)); //{ cout << "å‘åŒ…å¤±è´¥"; return 1; }// !=0çš„æ—¶å€™ä¸ºsendå‘ç”Ÿé”™è¯¯
-	//else { return 1; }
-	return 1;
-}
-//è·¯ç”±è½¬å‘å‡½æ•°
-void routeForward(pcap_t* adhandle, ICMP_t data, BYTE DstMAC[])
-{
-	Data_t* temp = (Data_t*)&data;
-	memcpy(temp->FrameHeader.SrcMAC, temp->FrameHeader.DesMAC, 6);//æºMACä¸ºæœ¬æœºMAC
-	memcpy(temp->FrameHeader.DesMAC, DstMAC, 6);//ç›®çš„MACä¸ºä¸‹ä¸€è·³MAC
-	temp->IPHeader.TTL -= 1;//TTL-1
-	if (temp->IPHeader.TTL < 0) {
-		return;//ä¸¢å¼ƒ
+//Â·ÓÉ×ª·¢º¯Êı
+void routeForward(pcap_t* adhandle, ICMP_t data, BYTE DstMAC[]){
+	Data_t* sendPacket = (Data_t*)&data;
+	memcpy(sendPacket->FrameHeader.SrcMAC, sendPacket->FrameHeader.DesMAC, 6);	//Ô´MACÎª±¾»úMAC
+	memcpy(sendPacket->FrameHeader.DesMAC, DstMAC, 6);	//Ä¿µÄMACÎªÏÂÒ»ÌøMAC
+	sendPacket->IPHeader.TTL -= 1;	//¸üĞÂTTL
+	if (sendPacket->IPHeader.TTL < 0) {
+		printf("TTL is negative!\n");
+		return;//¶ªÆú
 	}
-	setCheckSum(temp);//é‡æ–°è®¾ç½®æ ¡éªŒå’Œ
-	int res = pcap_sendpacket(adhandle, (const u_char*)temp, 74);//å‘é€æ•°æ®æŠ¥
+	setCheckSum(sendPacket);//ÖØĞÂÉèÖÃĞ£ÑéºÍ
+	int res = pcap_sendpacket(adhandle, (const u_char*)sendPacket, 74);//·¢ËÍÊı¾İ±¨
 	if (res == 0) {
+		//·¢ËÍ³É¹¦ ´òÓ¡ÈÕÖ¾
+		outputLog(sendPacket, 0);
 		printf("Forwarding a message to : ");
 		printMAC(DstMAC);
 		printf("\n");
 	}
-	//ltable.write2log_ip("è½¬å‘", temp);//å†™å…¥æ—¥å¿—
 }
-//è·å–æœ¬æœºMACåœ°å€
+//»ñÈ¡±¾»úMACµØÖ·
 void getLocalMAC(pcap_if_t* device) {
 	int index = 0;
 	//for (pcap_if_t* d = alldevs; d != nullptr; d = d->next){
 	for (pcap_addr* a = device->addresses; a != nullptr; a = a->next) {
 		if (((struct sockaddr_in*)a->addr)->sin_family == AF_INET && a->addr) {
-			//æ‰“å°æœ¬æœºIPåœ°å€
+			//´òÓ¡±¾»úIPµØÖ·
 			printf("%s\t%s\n", "Local IP Address:", inet_ntoa(((struct sockaddr_in*)a->addr)->sin_addr));
-			//åœ¨å½“å‰ç½‘å¡ä¸Šä¼ªé€ ä¸€ä¸ªåŒ…
+			//ÔÚµ±Ç°Íø¿¨ÉÏÎ±ÔìÒ»¸ö°ü
 			ARPFrame_t ARPFrame = MakeARP();
 			//ARPFrame.SendIP = inet_addr(inet_ntoa(((struct sockaddr_in*)a->addr)->sin_addr));
 			ARPFrame.SendIP = inet_addr("0.0.0.0");
 			ARPFrame.RecvIP = inet_addr(ipList[index]);
-			//æ‰“å¼€è¯¥ç½‘å¡çš„ç½‘ç»œæ¥å£
+			//´ò¿ª¸ÃÍø¿¨µÄÍøÂç½Ó¿Ú
 			pcap_t* adhandle = pcap_open(device->name, 655340, PCAP_OPENFLAG_PROMISCUOUS, 1000, 0, 0);
 			if (adhandle == NULL) { printf("Failed to open an interface!\n"); return; }
-			//å‘é€ARPåŒ…
+			//·¢ËÍARP°ü
 			int res = pcap_sendpacket(adhandle, (u_char*)&ARPFrame, sizeof(ARPFrame_t));
-			//æ•è·æ•°æ®åŒ…
+			//²¶»ñÊı¾İ°ü
 			ARPFrame_t* RecPacket;
 			struct pcap_pkthdr* pkt_header;
 			const u_char* pkt_data;
@@ -432,52 +450,50 @@ void getLocalMAC(pcap_if_t* device) {
 				if (!CompareMAC(RecPacket->FrameHeader.SrcMAC, ARPFrame.FrameHeader.SrcMAC)
 					&& CompareMAC(RecPacket->FrameHeader.DesMAC, ARPFrame.FrameHeader.SrcMAC)
 					&& RecPacket->SendIP == ARPFrame.RecvIP
-					) { //è¿‡æ»¤å®Œæ¯•
-					CopyMAC(RecPacket->FrameHeader.SrcMAC, MyMAC);//å­˜å‚¨æœ¬æœºMAC
-					//æ‰“å°è·å–çš„MACåœ°å€
+					) { //¹ıÂËÍê±Ï
+					CopyMAC(RecPacket->FrameHeader.SrcMAC, MyMAC);//´æ´¢±¾»úMAC
+					//´òÓ¡»ñÈ¡µÄMACµØÖ·
 					printf("Target mac address: ");
 					printMAC(RecPacket->FrameHeader.SrcMAC);
 					printf("\n");
-					//æ’å…¥ARPè¡¨
+					//²åÈëARP±í
 					arpTable.insert(inet_addr(ipList[index]), RecPacket->FrameHeader.SrcMAC);
 					index++;
 					break;
 				}
 			}
-
 		}
-		//}
 	}
 }
-//è·å–è¿œç«¯MACåœ°å€
+//»ñÈ¡Ô¶¶ËMACµØÖ·
 void getRemoteMAC(pcap_if_t* device, DWORD DstIP) {
 	int index = 0;
 	//for (pcap_if_t* d = alldevs; d != nullptr; d = d->next) {
 		for (pcap_addr* a = device->addresses; a != nullptr; a = a->next) {
 			if (((struct sockaddr_in*)a->addr)->sin_family == AF_INET && a->addr) {
 				DWORD devIP = inet_addr(inet_ntoa(((struct sockaddr_in*)a->addr)->sin_addr));
-				//ä½¿ç”¨åŒç½‘æ®µçš„IPæ¥è·å–è¿œç«¯MACåœ°å€
+				//Ê¹ÓÃÍ¬Íø¶ÎµÄIPÀ´»ñÈ¡Ô¶¶ËMACµØÖ·
 				if ((devIP & inet_addr(maskList[index])) != (DstIP & inet_addr(maskList[index]))) {
 					continue;
 				}
-				//æ‰“å°è¿œç«¯IPå’Œæœ¬æœºIPåœ°å€
+				//´òÓ¡Ô¶¶ËIPºÍ±¾»úIPµØÖ·
 				unsigned char* pIP = (unsigned char*)&DstIP;
 				printf("Remote IP Address: %u.%u.%u.%u \n", *pIP, *(pIP + 1), *(pIP + 2), *(pIP + 3));
 				pIP = (unsigned char*)&devIP;
 				printf("Device IP Address: %u.%u.%u.%u \n", *pIP, *(pIP + 1), *(pIP + 2), *(pIP + 3));
-				//åœ¨å½“å‰ç½‘å¡ä¸Šä¼ªé€ ä¸€ä¸ªåŒ…
+				//ÔÚµ±Ç°Íø¿¨ÉÏÎ±ÔìÒ»¸ö°ü
 				ARPFrame_t ARPFrame = MakeARP();
-				//æ›´æ–°ä¼ªé€ çš„ARPåŒ… å°†æœ¬æœºçš„MACå¡«å…¥
+				//¸üĞÂÎ±ÔìµÄARP°ü ½«±¾»úµÄMACÌîÈë
 				CopyMAC(MyMAC, ARPFrame.FrameHeader.SrcMAC);
 				CopyMAC(MyMAC, ARPFrame.SendHa);
 				ARPFrame.SendIP = inet_addr(inet_ntoa(((struct sockaddr_in*)a->addr)->sin_addr));
 				ARPFrame.RecvIP = DstIP;
-				//æ‰“å¼€è¯¥ç½‘å¡çš„ç½‘ç»œæ¥å£
+				//´ò¿ª¸ÃÍø¿¨µÄÍøÂç½Ó¿Ú
 				pcap_t* adhandle = pcap_open(device->name, 655340, PCAP_OPENFLAG_PROMISCUOUS, 1000, 0, 0);
 				if (adhandle == NULL) { printf("Failed to open an interface!\n"); return; }
-				//å‘é€ARPåŒ…
+				//·¢ËÍARP°ü
 				int res = pcap_sendpacket(adhandle, (u_char*)&ARPFrame, sizeof(ARPFrame_t));
-				//æ•è·æ•°æ®åŒ…
+				//²¶»ñÊı¾İ°ü
 				ARPFrame_t* RecPacket;
 				struct pcap_pkthdr* pkt_header;
 				const u_char* pkt_data;
@@ -486,8 +502,8 @@ void getRemoteMAC(pcap_if_t* device, DWORD DstIP) {
 					if (!CompareMAC(RecPacket->FrameHeader.SrcMAC, ARPFrame.FrameHeader.SrcMAC)
 						&& CompareMAC(RecPacket->FrameHeader.DesMAC, ARPFrame.FrameHeader.SrcMAC)
 						&& RecPacket->SendIP == ARPFrame.RecvIP
-						) {	//è¿‡æ»¤æˆåŠŸ
-						//æ’å…¥ARPè¡¨
+						) {	//¹ıÂË³É¹¦
+						//²åÈëARP±í
 						arpTable.insert(DstIP, RecPacket->FrameHeader.SrcMAC);
 						break;
 					}
@@ -497,7 +513,7 @@ void getRemoteMAC(pcap_if_t* device, DWORD DstIP) {
 		//}
 	}
 }
-//æ•è·IPæ•°æ®æŠ¥
+//²¶»ñIPÊı¾İ±¨
 ICMP CapturePacket(pcap_if_t* device) {
 	pcap_t* adhandle = pcap_open(device->name, 655340, PCAP_OPENFLAG_PROMISCUOUS, 1000, 0, 0);
 	pcap_pkthdr* pkt_header;
@@ -507,78 +523,78 @@ ICMP CapturePacket(pcap_if_t* device) {
 		int res = pcap_next_ex(adhandle, &pkt_header, &pkt_data);
 		if (res > 0) {
 			FrameHeader_t* header = (FrameHeader_t*)pkt_data;
-			//printf("Capture a packet send to: ");
-			//printMAC(header->DesMAC);
-			//printf("\n");
-			if (CompareMAC(header->DesMAC, MyMAC)){//å‘ç»™æœ¬æœº
-				if (ntohs(header->FrameType) == 0x800){//IPæ ¼å¼çš„æ•°æ®æŠ¥
-					printf("Capture a ip packet send to me!\n");
+			if (CompareMAC(header->DesMAC, MyMAC)) {//·¢¸ø±¾»ú
+				if (ntohs(header->FrameType) == 0x800) {//IP¸ñÊ½µÄÊı¾İ±¨
+					//printf("Capture a ip packet send to me!\n");
 					Data_t* data = (Data_t*)pkt_data;
 					if (!checkCheckSum(data)) {
 						printf("Check error!\n");
 						continue;
 					}
-					//ltable.write2log_ip("æ¥æ”¶", data);//å°†æ¥æ”¶å†…å®¹å†™å…¥æ—¥å¿—
-					//æå–IPæ•°æ®æŠ¥ä¸­çš„ç›®çš„IP
+					//´òÓ¡ÈÕÖ¾
+					outputLog(data, 1);
+					//ÌáÈ¡IPÊı¾İ±¨ÖĞµÄÄ¿µÄIP
 					DWORD DstIP = data->IPHeader.DstIP;
 					unsigned char* pIP = (unsigned char*)&DstIP;
-					//åˆ°è·¯ç”±è¡¨ä¸­æŸ¥æ‰¾
+					//µ½Â·ÓÉ±íÖĞ²éÕÒ
 					DWORD routeFind = routeTable.lookup(DstIP);
-					printf("Find route for ");
-					printf("address: %u.%u.%u.%u \n", *pIP, *(pIP + 1), *(pIP + 2), *(pIP + 3));
-					if (routeFind == -1) {//æ²¡æœ‰è¯¥è·¯ç”±æ¡ç›®
+					printf("Find route for address: %u.%u.%u.%u \n", *pIP, *(pIP + 1), *(pIP + 2), *(pIP + 3));
+
+					pIP = (unsigned char*)&routeFind;
+					printf("NextHop address: %u.%u.%u.%u \n", *pIP, *(pIP + 1), *(pIP + 2), *(pIP + 3));
+
+					if (routeFind == -1) {//Ã»ÓĞ¸ÃÂ·ÓÉÌõÄ¿
 						printf("The entry was not found!\n");
 						continue;
 					}
+
 					printf("Find route successfully!\n");
-					if (data->IPHeader.DstIP != inet_addr(ipList[0]) || data->IPHeader.DstIP != inet_addr(ipList[1])) {
-						//æ£€æŸ¥æ˜¯å¦ä¸ºå¹¿æ’­æ¶ˆæ¯
-						BYTE broadcast[6] = "fffff";
-						if (!CompareMAC(data->FrameHeader.DesMAC, broadcast)
-							&& !CompareMAC(data->FrameHeader.SrcMAC, broadcast)
-							)
-						{
-							//printf("Not a broadcast message!\n");
-							//ICMPæŠ¥æ–‡åŒ…å«IPæ•°æ®åŒ…æŠ¥å¤´å’Œå…¶å®ƒå†…å®¹
-							ICMP_t* sendPacket_t = (ICMP_t*)pkt_data;
-							ICMP_t sendPacket = *sendPacket_t;
-							BYTE mac[6];
-							if (routeFind == 0) {
-								//é»˜è®¤è·¯ç”±é¡¹ ç›´æ¥æŠ•é€’ åˆ°ARPè¡¨ä¸­æŸ¥è¯¢DstIP
+					//¼ì²éÊÇ·ñÎª¹ã²¥ÏûÏ¢
+					BYTE broadcast[6] = "fffff";
+					if (!CompareMAC(data->FrameHeader.DesMAC, broadcast)
+						&& !CompareMAC(data->FrameHeader.SrcMAC, broadcast)
+						)
+					{
+						//printf("Not a broadcast message!\n");
+						//ICMP±¨ÎÄ°üº¬IPÊı¾İ°ü±¨Í·ºÍÆäËüÄÚÈİ
+						ICMP_t* sendPacket_t = (ICMP_t*)pkt_data;
+						ICMP_t sendPacket = *sendPacket_t;
+						BYTE mac[6];
+						if (routeFind == 0) {
+							//Ä¬ÈÏÂ·ÓÉÏî Ö±½ÓÍ¶µİ µ½ARP±íÖĞ²éÑ¯DstIP
+							if (arpTable.lookup(DstIP, mac) == -1) {
+								//ARP±íÖĞÎŞ¸ÃÌõÄ¿ µ÷ÓÃgetRemoteMACº¯Êı»ñÈ¡Ä¿µÄIPµÄMACµØÖ·
+								printf("Start to get the mac of remote devices!\n");
+								getRemoteMAC(device, DstIP);
+								//´òÓ¡¸üĞÂºóµÄARP±í
+								arpTable.printTable();
 								if (arpTable.lookup(DstIP, mac) == -1) {
-									//ARPè¡¨ä¸­æ— è¯¥æ¡ç›® è°ƒç”¨getRemoteMACå‡½æ•°è·å–ç›®çš„IPçš„MACåœ°å€
-									printf("Start to get the mac of remote devices!\n");
-									getRemoteMAC(device, DstIP);
-									//æ‰“å°æ›´æ–°åçš„ARPè¡¨
-									arpTable.printTable();
-									if (arpTable.lookup(DstIP, mac) == -1) {
-										//ä»æ—§æœªæ‰¾åˆ°
-										printf("Error, Can not get the mac!");
-										continue;
-									}
+									//ÈÔ¾ÉÎ´ÕÒµ½
+									printf("Error, Can not get the mac!");
+									continue;
 								}
-								printf("The mac of DstIP:");
-								printMAC(mac);
-								printf("\n");
-								//æ›´æ–°MACåœ°å€å¹¶è½¬å‘IPæ•°æ®æŠ¥
-								routeForward(adhandle, sendPacket, mac);
 							}
-							else {//éé»˜è®¤è·¯ç”± è·å–ä¸‹ä¸€è·³çš„IPåœ°å€ åˆ°ARPè¡¨ä¸­æŸ¥è¯¢nextHopçš„MACåœ°å€
+							printf("The mac of DstIP:");
+							printMAC(mac);
+							printf("\n");
+							//¸üĞÂMACµØÖ·²¢×ª·¢IPÊı¾İ±¨
+							routeForward(adhandle, sendPacket, mac);
+						}
+						else {//·ÇÄ¬ÈÏÂ·ÓÉ »ñÈ¡ÏÂÒ»ÌøµÄIPµØÖ· µ½ARP±íÖĞ²éÑ¯nextHopµÄMACµØÖ·
+							if (arpTable.lookup(routeFind, mac) == -1) {
+								printf("Start to get the mac of remote devices!\n");
+								getRemoteMAC(device, routeFind);
+								arpTable.printTable();
 								if (arpTable.lookup(routeFind, mac) == -1) {
-									printf("Start to get the mac of remote devices!\n");
-									getRemoteMAC(device, routeFind);
-									arpTable.printTable();
-									if (arpTable.lookup(routeFind, mac) == -1) {
-										printf("Error, Can not get the mac!");
-										continue;
-									}
+									printf("Error, Can not get the mac!");
+									continue;
 								}
-								printf("The mac of nextHop:");
-								printMAC(mac);
-								printf("\n");
-								//æ›´æ–°MACåœ°å€å¹¶è½¬å‘IPæ•°æ®æŠ¥
-								routeForward(adhandle, sendPacket, mac);
 							}
+							printf("The mac of nextHop:");
+							printMAC(mac);
+							printf("\n");
+							//¸üĞÂMACµØÖ·²¢×ª·¢IPÊı¾İ±¨
+							routeForward(adhandle, sendPacket, mac);
 						}
 					}
 				}
@@ -588,22 +604,24 @@ ICMP CapturePacket(pcap_if_t* device) {
 }
 
 int main() {
+	cout << sizeof(ICMP_t) << endl;
+	return 0;
 
-	//pcap_if_t* alldevs;				 //æ‰€æœ‰ç½‘ç»œé€‚é…å™¨
-	char errbuf[PCAP_ERRBUF_SIZE];   //é”™è¯¯ç¼“å†²åŒº,å¤§å°ä¸º256
+	//pcap_if_t* alldevs;				 //ËùÓĞÍøÂçÊÊÅäÆ÷
+	char errbuf[PCAP_ERRBUF_SIZE];   //´íÎó»º³åÇø,´óĞ¡Îª256
 	pcap_findalldevs_ex(PCAP_SRC_IF_STRING, NULL, &alldevs, errbuf);
 
-	//è·å–è®¾å¤‡ä¿¡æ¯
+	//»ñÈ¡Éè±¸ĞÅÏ¢
 	DevsInfo(alldevs);
-	//åˆå§‹åŒ–è·¯ç”±è¡¨å¹¶æ‰“å°
+	//³õÊ¼»¯Â·ÓÉ±í²¢´òÓ¡
 	routeTable.initRouteTable();
 	routeTable.printTable();
-	//è·å–æœ¬æœºMACåœ°å€
+	//»ñÈ¡±¾»úMACµØÖ·
 	getLocalMAC(alldevs);
-	//æ‰“å°ARPè¡¨
+	//´òÓ¡ARP±í
 	arpTable.printTable();
 
-	//è¾“å…¥å‘½ä»¤
+	//ÊäÈëÃüÁî
 	char control[6];
 	char option[6];
 	char ipAddress[32];
@@ -631,6 +649,7 @@ int main() {
 			else if (!strcmp(option, "delete") || !strcmp(option, "DELETE")) {
 				scanf("%s", ipAddress);
 				routeTable.deleteEntry(inet_addr(ipAddress));
+				continue;
 			}
 			else if (!strcmp(option, "print") || !strcmp(option, "PRINT")) {
 				routeTable.printTable();
@@ -643,7 +662,7 @@ int main() {
 			else if (!strcmp(option, "help") || !strcmp(option, "HELP")) {
 				printf("For example:\n");
 				printf(" > route add ip mask nexthop\n");
-				printf(" > route delete ip mask nexthop\n");
+				printf(" > route delete ip\n");
 				printf(" > route start\n");
 				printf(" > route print\n");
 				continue;
@@ -659,7 +678,7 @@ int main() {
 		else if (!strcmp(control, "exit") || !strcmp(control, "EXIT")) {
 			break;
 		}
-		printf("The wrong command was enteredï¼\n");
+		printf("The wrong command was entered£¡\n");
 	}
 
 	system("pause");
@@ -668,13 +687,9 @@ int main() {
 	//ulIP1 = inet_addr(szIP2);
 	//newEntry->destIP = ulIP1;
 
-	//unsigned char* pIP = (unsigned char*)&ulIP1;
-	//printf("IPåœ°å€: %u.%u.%u.%u \t MACåœ°å€: ", *pIP, *(pIP + 1), *(pIP + 2), *(pIP + 3));
-
 	//unsigned int ulIP2 = htonl(ulIP1);
 	//DWORD resultIP = inet_ntoa(*(in_addr*)(&ulIP2));
-	//cout << resultIP << endl;
 
-	//é‡Šæ”¾èµ„æº
+	//ÊÍ·Å×ÊÔ´
 	pcap_freealldevs(alldevs);
 }
