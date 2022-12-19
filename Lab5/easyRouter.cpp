@@ -604,8 +604,6 @@ ICMP CapturePacket(pcap_if_t* device) {
 }
 
 int main() {
-	cout << sizeof(ICMP_t) << endl;
-	return 0;
 
 	//pcap_if_t* alldevs;				 //所有网络适配器
 	char errbuf[PCAP_ERRBUF_SIZE];   //错误缓冲区,大小为256
