@@ -411,7 +411,7 @@ void routeForward(pcap_t* adhandle, ICMP_t data, BYTE DstMAC[]){
 	sendPacket->IPHeader.TTL -= 1;	//更新TTL
 	if (sendPacket->IPHeader.TTL < 0) {
 		printf("TTL is negative!\n");
-		return;//丢弃
+		return;
 	}
 	setCheckSum(sendPacket);//重新设置校验和
 	int res = pcap_sendpacket(adhandle, (const u_char*)sendPacket, 74);//发送数据报
@@ -575,10 +575,6 @@ ICMP CapturePacket(pcap_if_t* device) {
 								}
 							}
 							printf("The mac of DstIP:");
-							printMAC(mac);
-							printf("\n");
-							//更新MAC地址并转发IP数据报
-							routeForward(adhandle, sendPacket, mac);
 						}
 						else {//非默认路由 获取下一跳的IP地址 到ARP表中查询nextHop的MAC地址
 							if (arpTable.lookup(routeFind, mac) == -1) {
@@ -591,11 +587,11 @@ ICMP CapturePacket(pcap_if_t* device) {
 								}
 							}
 							printf("The mac of nextHop:");
-							printMAC(mac);
-							printf("\n");
-							//更新MAC地址并转发IP数据报
-							routeForward(adhandle, sendPacket, mac);
 						}
+						printMAC(mac);
+						printf("\n");
+						//更新MAC地址并转发IP数据报
+						routeForward(adhandle, sendPacket, mac);
 					}
 				}
 			}
